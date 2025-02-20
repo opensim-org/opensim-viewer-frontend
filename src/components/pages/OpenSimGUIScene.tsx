@@ -1,5 +1,4 @@
-import { useGLTF } from '@react-three/drei'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame, useLoader, useThree } from '@react-three/fiber'
 
 import * as THREE from 'three';
 
@@ -7,20 +6,35 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimationMixer, BoxHelper, Color, Group, Mesh, Object3D} from 'three'
 import { observer } from 'mobx-react'
 
-import SceneTreeModel from '../../helpers/SceneTreeModel'
 import { useModelContext } from '../../state/ModelUIStateContext'
 import { PerspectiveCamera } from 'three/src/cameras/PerspectiveCamera'
 import viewerState from '../../state/ViewerState'
+import { OpenSimLoader } from '../../state/OpenSimLoader';
 
 interface OpenSimSceneProps {
     currentModelPath: string,
     supportControls:boolean
 }
 
-const OpenSimScene: React.FC<OpenSimSceneProps> = ({ currentModelPath, supportControls }) => {
+const OpenSimGUIScene: React.FC<OpenSimSceneProps> = ({ currentModelPath, supportControls }) => {
 
     // useGLTF suspends the component, it literally stops processing
-    const { scene, animations } = useGLTF(currentModelPath);
+    const sceneRef = useRef<THREE.Scene>(new THREE.Scene());
+    const modelGroup = useLoader(OpenSimLoader, currentModelPath)
+    const computeNormals = (group: Group)=>{
+      group.traverse((o) => {
+        if (o.type === "Mesh"){
+          (o as Mesh).geometry.computeVertexNormals()
+        }
+      }
+    )
+    };
+    computeNormals(modelGroup as Group);
+    if (sceneRef.current!==null) 
+      sceneRef.current.add(modelGroup as Group);
+    
+    const scene = sceneRef.current;
+    const animations = modelGroup!.animations;
     const { set, gl} = useThree();
     const no_face_cull = (scene: Group)=>{
       if (scene) {
@@ -62,7 +76,7 @@ const OpenSimScene: React.FC<OpenSimSceneProps> = ({ currentModelPath, supportCo
         //console.log(obj3d.name, layerNum)
     }
   }
-    no_face_cull(scene);
+  // no_face_cull(scene);
 
     const applyAnimationColors = ()=>{
       colorNodeMap.forEach((node)=>{
@@ -84,9 +98,19 @@ const OpenSimScene: React.FC<OpenSimSceneProps> = ({ currentModelPath, supportCo
     const [colorNodeMap] = useState<Map<string, Object3D>>(new Map<string, Object3D>());
 
     let curState = useModelContext();
-    ///curState.scene = scene;
+    if (curState.scene === null)
+      curState.scene = sceneRef.current;
 
-    const sceneRef = useRef<THREE.Scene>()
+    curState.addModelToMap(modelGroup!.uuid, modelGroup!);
+    if (curState.getNumberOfOpenModels()>=1) {
+      const boundingBox = new THREE.Box3();
+      // Compute the bounding box of the scene if models are already loaded
+      boundingBox.setFromObject(sceneRef.current);
+      const modelbbox = new THREE.Box3().setFromObject(modelGroup!)
+      modelGroup!.position.z = boundingBox.max.z-modelbbox.min.z
+    }
+
+    //const sceneRef = useRef<THREE.Scene>()
     const lightRef = useRef<THREE.DirectionalLight | null>(null)
     const spotlightRef = useRef<THREE.SpotLight>(null)
     const [currentCamera, setCurrentCamera] = useState<PerspectiveCamera>()
@@ -182,18 +206,6 @@ const OpenSimScene: React.FC<OpenSimSceneProps> = ({ currentModelPath, supportCo
         objectSelectionBox.visible = false;
         scene.add(objectSelectionBox!);
       }
-      // First child of scene is model, grab info from it
-      const modelData = scene.children[0].userData;
-      if (modelData.name.startsWith('Model')){
-        // Populate model name, description and authors if not null
-        let desc = 'description'
-        let authors = 'authors'
-        if (modelData.description !== undefined)
-          desc = modelData.description
-        if (modelData.authors !== undefined)
-          authors = modelData.authors
-        curState.setModelInfo(modelData.name, desc, authors)
-      }
     }
 
     // Make sure mixers match animations
@@ -220,7 +232,7 @@ const OpenSimScene: React.FC<OpenSimSceneProps> = ({ currentModelPath, supportCo
               }
               else {
                 let selectedObject = sceneObjectMap.get(curState.selected)!
-                if (selectedObject !== undefined && selectedObject.type === "Mesh") {
+                if (selectedObject !== undefined && selectedObject.type !== 'BoxHelper') {
                     if (objectSelectionBox !== null) {
                       objectSelectionBox?.setFromObject(selectedObject);
                       objectSelectionBox!.visible = true
@@ -279,7 +291,7 @@ const OpenSimScene: React.FC<OpenSimSceneProps> = ({ currentModelPath, supportCo
         setUseEffectRunning(false)
         if (supportControls) {
             curState.setCurrentModelPath(currentModelPath)
-            ///curState.setSceneTree(new SceneTreeModel(scene))
+            /// curState.setSceneTree(new SceneTreeModel(scene))
             curState.setAnimationList(animations)
         }
         return () => {
@@ -296,7 +308,7 @@ const OpenSimScene: React.FC<OpenSimSceneProps> = ({ currentModelPath, supportCo
     
     // By the time we're here the model is guaranteed to be available
     return <>
-    <primitive object={scene} ref={sceneRef}
+    <primitive object={sceneRef.current} ref={sceneRef}
       onPointerDown={(e: any) => curState.setSelected(e.object.uuid)}
       onPointerMissed={() => curState.setSelected("")}/>
       <directionalLight ref={lightRef} position={[0.5, 1.5, -0.5]} 
@@ -307,8 +319,8 @@ const OpenSimScene: React.FC<OpenSimSceneProps> = ({ currentModelPath, supportCo
         shadow-camera-right={2}
         shadow-camera-top={2}
         shadow-camera-bottom={-2}/>
-      <spotLight visible={viewerState.spotLight} ref={spotlightRef} position={[0.5, 2.5, -.05]} color={viewerState.lightColor}/>
+      <spotLight visible={viewerState.spotLight} ref={spotlightRef} position={[0.5, 1.5, -.05]} color={viewerState.lightColor} penumbra={0.2} />
       </>
 }
 
-export default observer(OpenSimScene)
+export default observer(OpenSimGUIScene)

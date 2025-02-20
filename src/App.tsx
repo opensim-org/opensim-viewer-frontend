@@ -1,19 +1,6 @@
-import HomePage from './components/pages/HomePage'
-import AboutPage from './components/pages/AboutPage'
-import ModelListPage from './components/pages/ModelListPage/ModelListPage'
 import ModelViewPage from './components/pages/ModelViewPage'
-import LoginPage from './components/pages/LoginPage'
-import LogoutPage from './components/pages/LogoutPage'
-import RegisterPage from './components/pages/RegisterPage'
-import Chart from './components/pages/Chart'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { observer } from 'mobx-react'
-import { ThemeProvider, CssBaseline } from '@mui/material'
-import appTheme from './Theme'
-import lightTheme from './LightTheme'
-import OpenSimAppBar from './components/Nav/OpenSimAppBar'
 import viewerState from './state/ViewerState'
-import { SnackbarProvider } from 'notistack'
 import { Amplify } from 'aws-amplify';
 import type { WithAuthenticatorProps } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
@@ -80,48 +67,7 @@ function App({ signOut, user }: WithAuthenticatorProps) {
     ///viewer = redirect to viewer/DEFAULT_MODEL/ 
     // / current home page of opensim-viewer with upload and login options
     return (
-        <ThemeProvider theme={viewerState.dark ? appTheme : lightTheme}>
-          <SnackbarProvider>
-            <CssBaseline />
-            <BrowserRouter>
-                <div className="App" style={{ width: '100%', overflow: 'auto', backgroundColor: viewerState.dark ? appTheme.palette.background.default : lightTheme.palette.background.default}} ref={elementRef}>
-                    <div id="opensim-appbar-visibility" style={{display: displayAppBar}}>
-                      <OpenSimAppBar dark={viewerState.dark} isLoggedIn={viewerState.isLoggedIn} isFullScreen={viewerState.isFullScreen} toggleFullscreen={toggleFullscreen}/>
-                    </div>
-                    <div>
-                        <Routes>
-                            <Route path="/" element={<HomePage />} />
-                            <Route path="/about" element={<AboutPage />} />
-                            <Route
-                                path="/models"
-                                element={<ModelListPage featuredModelsFilePath={viewerState.featuredModelsFilePath} />}
-                            />
-                            <Route
-                                path="/viewer/:urlParam?"
-                                element={<ModelViewPage />}
-                            />
-                            <Route
-                                path="/log_in"
-                                element={<LoginPage isLoggedIn={viewerState.isLoggedIn}/>}
-                            />
-                            <Route
-                                path="/log_out"
-                                element={<LogoutPage isLoggedIn={viewerState.isLoggedIn}/>}
-                            />
-                            <Route
-                                path="/register"
-                                element={<RegisterPage />}
-                            />
-                            <Route
-                                path="/chart"
-                                element={<Chart />}
-                            />
-                        </Routes>
-                    </div>
-                </div>
-            </BrowserRouter>
-          </SnackbarProvider>
-        </ThemeProvider>
+        <ModelViewPage/>
     )
 }
 
